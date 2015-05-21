@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 from scipy import stats
 from scipy.interpolate import interp1d
 from scipy.interpolate import PchipInterpolator
-import os
 import time
 
 
@@ -57,14 +56,12 @@ class AgeModel:
             raise ValueError('z must be reported as depth from top!')
 
         if num_sigmaunits == 2:
-            self.original_data[:,2] = self.original_data[:,2] / 2.0
+            self.original_data[:, 2] = self.original_data[:, 2] / 2.0
 
-        self.dates = self.original_data[:,1]
-        self.dating_errors = self.original_data[:,2]
-        self.depths = self.original_data[:,0]
+        self.dates = self.original_data[:, 1]
+        self.dating_errors = self.original_data[:, 2]
+        self.depths = self.original_data[:, 0]
         self.date_count = self.dates.size
-
-
 
     def reset_to_originaldata(self):
         """
@@ -73,12 +70,10 @@ class AgeModel:
 
         """
 
-        self.dates = self.original_data[:,1]
-        self.dating_errors = self.original_data[:,2]
-        self.depths = self.original_data[:,0]
+        self.dates = self.original_data[:, 1]
+        self.dating_errors = self.original_data[:, 2]
+        self.depths = self.original_data[:, 0]
         self.date_count = self.dates.size
-
-
 
     def print_currentdata(self):
         """
@@ -91,11 +86,9 @@ class AgeModel:
         numlist = range(0, self.date_count)
 
         for n, d, a, e in zip(numlist, self.depths, self.dates,
-                              self.dating_errors*2):
+                              self.dating_errors * 2):
 
             print n, '.\t', d, '\t', a, '\t', e
-
-
 
     def print_modeldata(self):
         """
@@ -111,8 +104,6 @@ class AgeModel:
                               self.model_error):
 
             print n, '.\t', d, '\t', a, '\t', e
-
-
 
     def check_monotonicity(self):
         """
@@ -130,52 +121,52 @@ class AgeModel:
 
             # Initialize
             younger = self.dates[:-1]
-            youngest = younger - (self.dating_errors[:-1]*2)
+            youngest = younger - (self.dating_errors[:-1] * 2)
 
             older = self.dates[1:]
-            oldest = older + (self.dating_errors[1:]*2)
+            oldest = older + (self.dating_errors[1:] * 2)
 
             # Look for reversals, grab indices of that date and the older on
             reversal = np.atleast_2d(np.nonzero(younger > older)).T
-            reversal = np.concatenate((reversal, reversal+1), axis=1)
+            reversal = np.concatenate((reversal, reversal + 1), axis=1)
 
             # Do the same for intractable reversals
             bad_rev = np.atleast_2d(np.nonzero(youngest > oldest)).T
-            bad_rev = np.concatenate((bad_rev, bad_rev+1), axis=1)
+            bad_rev = np.concatenate((bad_rev, bad_rev + 1), axis=1)
 
             # Find, delete regular reversals that are also intractable
-            in_both = np.array(np.all((reversal[:,None,:] == bad_rev[None,:,:]),
-                                axis=-1).nonzero()).T
-            reversal = np.delete(reversal, in_both[:,0], 0)
+            in_both = np.array(np.all((reversal[:, None, :] == bad_rev[None, :, :]),
+                               axis=-1).nonzero()).T
+            reversal = np.delete(reversal, in_both[:, 0], 0)
 
             # Plot ages, if reversals are present
             if reversal.size + bad_rev.size > 0:
 
                 # Set axis parameters
-                fig, ax = plt.subplots(1,1, figsize=(10,10))
+                fig, ax = plt.subplots(1, 1, figsize=(10, 10))
                 ax.invert_yaxis()
                 ax.tick_params(labelsize=16, pad=15)
                 ax.set_xlabel('Years B.P.', fontsize=20, labelpad=20)
-                ax.set_ylabel('Depth in Sample (' +str(self.length_units) +
+                ax.set_ylabel('Depth in Sample (' + str(self.length_units) +
                               ')', fontsize=20, labelpad=20)
                 ax.xaxis.set_tick_params(which='major', length=10, width=1)
                 ax.yaxis.set_tick_params(which='major', length=10, width=1)
 
                 # Plot all ages and errors in black
                 ax.errorbar(self.dates, self.depths, lw=3, color='black',
-                            marker='o', xerr=self.dating_errors*2, elinewidth=3,
-                            ecolor='black')
+                            marker='o', xerr=self.dating_errors * 2,
+                            elinewidth=3, ecolor='black')
 
                 colors = ['orange', 'orange', 'red', 'red']
-                colored_errorbars = [reversal[:,0], reversal[:,1],
-                                     bad_rev[:,0], bad_rev[:,1]]
+                colored_errorbars = [reversal[:, 0], reversal[:, 1],
+                                     bad_rev[:, 0], bad_rev[:, 1]]
 
                 # Over that, plot regular reversals in orange and
                 # intractable in red
                 for c, ce in zip(colors, colored_errorbars):
 
                     ax.errorbar(self.dates[ce], self.depths[ce],
-                                xerr=self.dating_errors[ce]*2, elinewidth=3,
+                                xerr=self.dating_errors[ce] * 2, elinewidth=3,
                                 color='none', ecolor=c, marker='o')
 
                 plt.show()
@@ -199,7 +190,7 @@ class AgeModel:
                 # either by enlarging indicated errorbars or removing dates
                 if edit_table:
 
-                    largerr = raw_input('\nEnter the numbers of the dating '+
+                    largerr = raw_input('\nEnter the numbers of the dating ' +
                                         'errors you wish to enlarge:\t')
                     if len(largerr) > 0:
                         largerr = largerr.replace(',', ' ').split()
@@ -208,7 +199,7 @@ class AgeModel:
                         for i in largerr:
                             self.dating_errors[i] = self.dating_errors[i] * 1.5
 
-                    remove_dates = raw_input('\nEnter the numbers of the dates '+
+                    remove_dates = raw_input('\nEnter the numbers of the dates ' +
                                              'you wish to remove:\t')
                     if len(remove_dates) > 0:
 
@@ -221,22 +212,21 @@ class AgeModel:
                         self.depths = np.delete(self.depths, remove_dates)
                         self.date_count = self.dates.size
 
-
                     # Updated plot and dating table are displayed
                     # User may proceed with current data table or
                     # revert to the original data
                     print '\nUpdated Age Plot and Data Table'
 
                     ax.errorbar(self.dates, self.depths, lw=3, color='black',
-                                marker='o', xerr=self.dating_errors*2,
+                                marker='o', xerr=self.dating_errors * 2,
                                 elinewidth=3, ecolor='black')
 
                     plt.show()
 
                     self.print_currentdata()
 
-                    keepnew = raw_input('\nEnter `k` to keep and check '+
-                                        'monotonicity of new age data table '+
+                    keepnew = raw_input('\nEnter `k` to keep and check ' +
+                                        'monotonicity of new age data table ' +
                                         'or `r` to revert to original data:\t')
 
                     if keepnew[0].lower() == 'r':
@@ -248,8 +238,6 @@ class AgeModel:
         # Prints model-ready dating table
         print "\nHere is the age data ready for modelling:"
         self.print_currentdata()
-
-
 
     def montycarlo(self, successful_sims, minutes_torun=2):
         """
@@ -290,7 +278,7 @@ class AgeModel:
                 simulation.append(random.gauss(date, error))
 
             simulation = (np.atleast_2d(np.asarray(simulation)
-                                         ).reshape(self.date_count, 1))
+                                        ).reshape(self.date_count, 1))
 
             monotonicity_test = simulation[1:] - simulation[:-1]
 
@@ -314,20 +302,17 @@ class AgeModel:
                     run_simulation = False
                     print 'Simulation timed out.\n'
 
-
         self.success_count = success_count
         self.simulation_count = simulation_count
 
         self.model_median = np.median(good_realiz, axis=1)
-        self.model_error = stats.nanstd(good_realiz, axis=1)*2
+        self.model_error = stats.nanstd(good_realiz, axis=1) * 2
 
         self.good_simulations = good_realiz
         self.all_simulations = all_realiz
 
-
-
     def view_montycarlo_results(self, xlabel, ylabel,
-                                figsize=(15,15), tick_dim=(10,2),
+                                figsize=(15, 15), tick_dim=(10, 2),
                                 tick_direction='in'):
         """
         View a plot that has the current depth-age data, all montycarlo
@@ -359,22 +344,23 @@ class AgeModel:
         """
 
         # Initialize
-        fig, ax = plt.subplots(1,1, figsize=figsize)
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
         ax.invert_yaxis()
 
         # Plot all the simulations that occurred in orange
         for i in range(0, self.simulation_count):
-            ax.plot(self.all_simulations[:,i], self.depths, color='orange')
+            ax.plot(self.all_simulations[:, i], self.depths, color='orange')
 
         # Plot only the monotonic simulations in black
         for i in range(0, self.success_count):
-            ax.plot(self.good_simulations[:,i], self.depths, color='black')
+            ax.plot(self.good_simulations[:, i], self.depths, color='black')
 
         # Plot the selected dates/depths in a bold line
         ax.plot(self.dates, self.depths, marker='o', lw=5, markersize=10)
 
         # Plot the median values of the monotonic simulations in a bold line
-        ax.plot(self.model_median, self.depths, marker='d', lw=5, markersize=10)
+        ax.plot(self.model_median, self.depths, marker='d', lw=5,
+                markersize=10)
 
         # Format plot ticks and labels
         ax.xaxis.set_tick_params(length=tick_dim[0], width=tick_dim[1],
@@ -386,8 +372,6 @@ class AgeModel:
         ax.set_xlabel(xlabel, fontsize=20, labelpad=20)
 
         return fig, ax
-
-
 
     def interpolate_agemodel(self, interpolation):
         """
@@ -409,11 +393,12 @@ class AgeModel:
                                       bounds_error=False, kind='linear')
 
             self.interp_eq_err_low = interp1d(self.depths, (self.model_median -
-                                               self.model_error), axis=0,
-                                              bounds_error=False, kind='linear')
+                                              self.model_error), axis=0,
+                                              bounds_error=False,
+                                              kind='linear')
 
             self.interp_eq_err_hi = interp1d(self.depths, (self.model_median +
-                                              self.model_error), axis=0,
+                                             self.model_error), axis=0,
                                              bounds_error=False, kind='linear')
 
         if interpolation is 'cubic':
@@ -431,8 +416,6 @@ class AgeModel:
                                                       (self.model_median +
                                                        self.model_error),
                                                       extrapolate=True)
-
-
 
     def get_subsammple_ages(self, sample_depths, depth_isrange=False,
                             interpolation='linear', usecurrent_interp=True,
@@ -487,7 +470,7 @@ class AgeModel:
         self.sample_ages = self.interp_eq(self.sample_depths)
         self.sample_herr = self.interp_eq_err_hi(self.sample_depths)
         self.sample_lerr = self.interp_eq_err_low(self.sample_depths)
-        self.sample_err = self.sample_herr-self.sample_ages
+        self.sample_err = self.sample_herr - self.sample_ages
 
         print ('***DISCLAIMER: Any automatically extrapolated ages will '
                'be crap, and therefore we recommend you do it yourself.***')
@@ -498,9 +481,8 @@ class AgeModel:
             # Return self.sample_ages as a column for copy-pasta into excel
             return np.concatenate((np.atleast_2d(self.sample_depths).T,
                                    np.atleast_2d(self.sample_ages).T,
-                                   np.atleast_2d(self.sample_err).T),axis=1)
-
-
+                                   np.atleast_2d(self.sample_err).T),
+                                  axis=1)
 
     def oxcal_format(self, z_upperbound=None, z_lowerbound=None):
         """
@@ -517,7 +499,7 @@ class AgeModel:
         if z_lowerbound is not None:
             lower_boundary = str(self.total_length - z_lowerbound)
         else:
-            lower_boundary = 0
+            lower_boundary = '0'
 
         print ('  Options(){BCAD=FALSE;};\n'
                '  Plot()\n'
@@ -531,7 +513,7 @@ class AgeModel:
             age = self.dates[date]
             err = self.dating_errors[date]
 
-            print ('      Date("",N(calBP('+ str(age) + '),' +
+            print ('      Date("",N(calBP(' + str(age) + '),' +
                    str(err) + ')){z=' + str(ht) + ';};')
 
         print ('      Boundary(){z=' + upper_boundary + ';};\n'
