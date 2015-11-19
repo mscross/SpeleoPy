@@ -1,521 +1,498 @@
+from __future__ import division, print_function, absolute_import
 import numpy as np
 import random
-import matplotlib.pyplot as plt
-from scipy import stats
 from scipy.interpolate import interp1d
 from scipy.interpolate import PchipInterpolator
-import time
 
 
-class AgeModel:
+class AgeModel(object):
     """
-    Class for processing age data and making a simple Monte Carlo age model.
-
-    Assumes date errors have a Gaussian distribution.
+    Make a simple Monte Carlo age model and get subsample ages.
+    Does not model across hiatuses or find hiatuses.
 
     """
 
-    def __init__(self, data, num_sigmaunits, total_length,
-                 length_units):
+    def __init__(self, z, dates, errors, length, is_2sigma=True,
+                 is_depth=True):
         """
-        Initialize AgeModel object.
-
-        Initializes several properties without checking for
-            age reversals.  self.find_reversals() should be used next
+        Initialize age model.
 
         Parameters
         ----------
-        data : list of 1d Numpy arrays
-            Use load_worksheet() and load_data in sample_record_class.py
-            Order should be depths, dates, date errors
-        num_sigmaunits : int
-            [1|2].  Whether the date errors are in 1 or 2 sigma.
-        total_length : float
-            The total length of the record.  Depths should be given as
-            distances from top (i.e., depth increases with age),
-            but if they are given as distances from bottom
-            this will be used to convert data to the correct format
-        length_units : string
-            The units of total_length, for example 'mm'
+        depths : (M) 1D ndarray of floats
+            The depth of each age control point.  In order of increasing depth.
+        dates : (M) 1D ndarray of floats
+            The age control points, in order of increasing age.
+        errors : (M) 1D ndarray of floats
+            The errors associated with each age control point.
+            In 1 or 2 sigma.
+        length : float
+            The total length of the record
+        is_2sigma : Boolean
+            Default True, ``errors`` are in two sigma.
+            Assumes Gaussian distribution of error.
+            Set ``False`` if error in 1 sigma.
+        is_depth : Boolean
+            Default ``True``, ``z`` indicates depths rather than height.
+
+        """
+        # Set 2 sigma errors
+        self.errors = errors
+        if not is_2sigma:
+            self.errors = errors * 2
+
+        # Set depths
+        if not is_depth:
+            self.depths = length - z
+            self.heights = z
+        else:
+            self.depths = z
+            self.heights = length - z
+
+        self.dates = dates
+        self.length = length
+        self.reversal = {}
+        self.intractable = {}
+        self.warning_color = 'orange'
+        self.good_color = 'black'
+        self.bad_color = 'red'
+
+    def _print_header(self):
+        """
+        Print  header for viewing age control, model, or subsample data.
 
         """
 
-        data_array = np.empty((data[0].size, 0))
+        print("\n\tDepth\tHeight\tAge\t\t2s Error\n")
 
-        for d in data:
-            d = np.atleast_2d(d).T
-            data_array = np.concatenate((data_array, d), axis=1)
-
-        self.original_data = data_array
-
-        self.total_length = total_length
-        self.length_units = length_units
-
-        # Check that depths increase with age
-        if not self.original_data[0][0] < self.original_data[-1][0]:
-            raise ValueError('z must be reported as depth from top!')
-
-        if num_sigmaunits == 2:
-            self.original_data[:, 2] = self.original_data[:, 2] / 2.0
-
-        self.dates = self.original_data[:, 1]
-        self.dating_errors = self.original_data[:, 2]
-        self.depths = self.original_data[:, 0]
-        self.date_count = self.dates.size
-
-    def reset_to_originaldata(self):
+    def print_agecontrol_dates(self):
         """
-        Reset self.dates, self.depths, self.dating_errors after modification
-            to the original data read in from datafile.
+        Print the current sequence of age control points.
 
         """
 
-        self.dates = self.original_data[:, 1]
-        self.dating_errors = self.original_data[:, 2]
-        self.depths = self.original_data[:, 0]
-        self.date_count = self.dates.size
+        self._print_header()
 
-    def print_currentdata(self):
+        for n, (d, h, a, e) in enumerate(zip(self.depths, self.heights,
+                                             self.dates, self.errors)):
+
+            print(n, '.\t', d, '\t', h, '\t', a, '\t', e)
+
+    def print_model_dates(self):
         """
-        Print the current depths, dates, errors in a numbered list.
-
-        """
-
-        # Print header
-        print "\n\tDepth\tAge\t\t2s Error\n"
-        numlist = range(0, self.date_count)
-
-        for n, d, a, e in zip(numlist, self.depths, self.dates,
-                              self.dating_errors * 2):
-
-            print n, '.\t', d, '\t', a, '\t', e
-
-    def print_modeldata(self):
-        """
-        Print the current depths, dates, errors in a numbered list.
+        Print the modelled age control points.
 
         """
 
-        # Print header
-        print "\n\tDepth\tAge\t\t2s Error\n"
-        numlist = range(0, self.date_count)
+        self._print_header()
 
-        for n, d, a, e in zip(numlist, self.depths, self.model_median,
-                              self.model_error):
+        try:
+            for n, (d, h, a, e) in enumerate(zip(self.depths, self.heights,
+                                                 self.model_median,
+                                                 self.model_error)):
+                print(n, '.\t', d, '\t', h, '\t', a, '\t', e)
+        except AttributeError:
+            print('Model not yet calculated')
 
-            print n, '.\t', d, '\t', a, '\t', e
+    def print_subsample_dates(self):
+        """
+        Print the subsample depths, ages, and age errors
+
+        """
+
+        self._print_header()
+
+        try:
+            for n, (d, h, a, e) in enumerate(zip(self.subsample_depths,
+                                                 self.subsample_heights,
+                                                 self.subsample_ages,
+                                                 self.subsample_err)):
+                print(n, '.\t', d, '\t', h, '\t', a, '\t', e)
+        except AttributeError:
+            print('Subsample ages not yet interpolated')
 
     def check_monotonicity(self):
         """
-        Inspects dating information for tractable and intractable
-            reversals and prompts the user to do something about it.
-
-        Shows a plot with 2s error bars colored according to reversal status.
+        Check if the ages are monotonically increasing with depth.
+        Distinguishes between tractable (errorbars overlap) and intractable
+        (errorbars do not overlap) age reversals.
 
         """
 
-        # Set loop condition
-        needs_work = True
+        younger = self.dates[:-1]
 
-        while needs_work:
+        # Convert errors, dates, depths, heights to arrays if necessary
+        try:
+            youngest = younger - self.errors[:-1]
 
-            # Initialize
-            younger = self.dates[:-1]
-            youngest = younger - (self.dating_errors[:-1] * 2)
+        except TypeError:
+            self.dates = np.array(self.dates)
+            self.errors = np.array(self.errors)
+            self.depths = np.array(self.depths)
+            self.heights = np.array(self.heights)
+            younger = np.array(younger)
+            youngest = younger - self.errors[:-1]
 
-            older = self.dates[1:]
-            oldest = older + (self.dating_errors[1:] * 2)
+        older = self.dates[1:]
+        oldest = older + self.errors[1:]
 
-            # Look for reversals, grab indices of that date and the older on
-            reversal = np.atleast_2d(np.nonzero(younger > older)).T
-            reversal = np.concatenate((reversal, reversal + 1), axis=1)
+        reversal = np.nonzero(younger > older)[0]
+        intractable = np.nonzero(youngest > oldest)[0]
 
-            # Do the same for intractable reversals
-            bad_rev = np.atleast_2d(np.nonzero(youngest > oldest)).T
-            bad_rev = np.concatenate((bad_rev, bad_rev + 1), axis=1)
+        reversal = set(np.union1d(reversal, reversal + 1))
+        self.intractable = set(np.union1d(intractable, intractable + 1))
 
-            # Find, delete regular reversals that are also intractable
-            in_both = np.array(np.all((reversal[:, None, :] == bad_rev[None, :, :]),
-                               axis=-1).nonzero()).T
-            reversal = np.delete(reversal, in_both[:, 0], 0)
+        # Separate tractable and intractable reversals
+        self.reversal = reversal - self.intractable
 
-            # Plot ages, if reversals are present
-            if reversal.size + bad_rev.size > 0:
-
-                # Set axis parameters
-                fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-                ax.invert_yaxis()
-                ax.tick_params(labelsize=16, pad=15)
-                ax.set_xlabel('Years B.P.', fontsize=20, labelpad=20)
-                ax.set_ylabel('Depth in Sample (' + str(self.length_units) +
-                              ')', fontsize=20, labelpad=20)
-                ax.xaxis.set_tick_params(which='major', length=10, width=1)
-                ax.yaxis.set_tick_params(which='major', length=10, width=1)
-
-                # Plot all ages and errors in black
-                ax.errorbar(self.dates, self.depths, lw=3, color='black',
-                            marker='o', xerr=self.dating_errors * 2,
-                            elinewidth=3, ecolor='black')
-
-                colors = ['orange', 'orange', 'red', 'red']
-                colored_errorbars = [reversal[:, 0], reversal[:, 1],
-                                     bad_rev[:, 0], bad_rev[:, 1]]
-
-                # Over that, plot regular reversals in orange and
-                # intractable in red
-                for c, ce in zip(colors, colored_errorbars):
-
-                    ax.errorbar(self.dates[ce], self.depths[ce],
-                                xerr=self.dating_errors[ce] * 2, elinewidth=3,
-                                color='none', ecolor=c, marker='o')
-
-                plt.show()
-
-                # Print the current dating table
-                self.print_currentdata()
-                edit_table = True
-
-                # User may accept dating table if there are no
-                # intractable reversals
-                if bad_rev.size == 0:
-                    print '\nNo intractable age reversals present. \n'
-                    edit_more = raw_input('Accept age data table for ' +
-                                          'modelling [Y/N]?\t')
-
-                    if edit_more[0].lower() == 'y':
-                        edit_table = False
-                        needs_work = False
-
-                # User edits table to get rid of intractable reversals,
-                # either by enlarging indicated errorbars or removing dates
-                if edit_table:
-
-                    largerr = raw_input('\nEnter the numbers of the dating ' +
-                                        'errors you wish to enlarge:\t')
-                    if len(largerr) > 0:
-                        largerr = largerr.replace(',', ' ').split()
-                        largerr = [int(i) for i in largerr]
-
-                        for i in largerr:
-                            self.dating_errors[i] = self.dating_errors[i] * 1.5
-
-                    remove_dates = raw_input('\nEnter the numbers of the dates ' +
-                                             'you wish to remove:\t')
-                    if len(remove_dates) > 0:
-
-                        remove_dates = remove_dates.replace(',', ' ').split()
-                        remove_dates = np.asarray(remove_dates, dtype=int)
-
-                        self.dates = np.delete(self.dates, remove_dates)
-                        self.dating_errors = np.delete(self.dating_errors,
-                                                       remove_dates)
-                        self.depths = np.delete(self.depths, remove_dates)
-                        self.date_count = self.dates.size
-
-                    # Updated plot and dating table are displayed
-                    # User may proceed with current data table or
-                    # revert to the original data
-                    print '\nUpdated Age Plot and Data Table'
-
-                    ax.errorbar(self.dates, self.depths, lw=3, color='black',
-                                marker='o', xerr=self.dating_errors * 2,
-                                elinewidth=3, ecolor='black')
-
-                    plt.show()
-
-                    self.print_currentdata()
-
-                    keepnew = raw_input('\nEnter `k` to keep and check ' +
-                                        'monotonicity of new age data table ' +
-                                        'or `r` to revert to original data:\t')
-
-                    if keepnew[0].lower() == 'r':
-                        self.reset_to_originaldata()
-
-            else:
-                needs_work = False
-
-        # Prints model-ready dating table
-        print "\nHere is the age data ready for modelling:"
-        self.print_currentdata()
-
-    def montycarlo(self, successful_sims, minutes_torun=2):
+    def adjust_errors(self, adjust_by, inds):
         """
-        Takes age data and errors and does cool stuff
+        Multiply the indicated errors by a given factor
+        to improve tractability.
+
+        Parameters
+        ----------
+        adjust_by : int or float or sequence of length (M)
+            The factor(s) by which the indicated errors will be multiplied
+        inds : int or sequence of ints of length (M)
+            Indices corresponding to the errors requiring adjustment
+
+        """
+
+        self.errors[inds] = self.errors[inds] * adjust_by
+
+    def delete_dates(self, inds):
+        """
+        Remove dates from the age model and update monotonicity results.
+
+        Parameters
+        ----------
+        inds : int or sequence of ints
+            The indices of the dates to delete.  Can be easily found with
+            ``self.print_agecontrol_dates()``
+
+        """
+
+        self.dates = np.delete(self.dates, inds)
+        self.depths = np.delete(self.depths, inds)
+        self.heights = np.delete(self.heights, inds)
+        self.errors = np.delete(self.errors, inds)
+
+        self.check_monotonicity()
+
+    def view_monotonicity(self, ax, use_depth=True, **ekwargs):
+        """
+        View a plot of the monotonicity test results.  Intractable reversals
+        are shown in red, tractable in orange, and monotonically increasing
+        dates in black.
+
+        Parameters
+        ----------
+        ax : matplotlib Axes object
+            The Axes on which to plot the montonicity test results.
+        use_depth : Boolean
+            Default ``True``, plot on depth scale.  If ``False``, plot on
+            height scale.
+        **ekwargs
+            Any Axes.errorbar keyword arguments
+
+        """
+        z = self.depths
+        if not use_depth:
+            z = self.heights
+
+        ax.errorbar(self.dates, z, xerr=self.errors,
+                    color=self.good_color, ecolor=self.good_color, **ekwargs)
+
+        for i in self.reversal:
+            ax.errorbar(self.dates[i], z[i], xerr=self.errors[i],
+                        color=self.warning_color, ecolor=self.warning_color,
+                        **ekwargs)
+
+        for i in self.intractable:
+            ax.errorbar(self.dates[i], z[i], xerr=self.errors[i],
+                        color=self.bad_color, ecolor=self.bad_color,
+                        **ekwargs)
+
+    def monty_carlo(self, successful_sims, max_sims):
+        """
+        Perform Monte Carlo age modelling.  Model median and error results are
+        determined by successful age model results.  Successful age models have
+        ages increasing monotonically with depth.
+
+        Monte Carlo simulations stop when either the number of successes or
+        the maximum number of simulations is reached.
 
         Parameters
         ----------
         successful_sims : int
-            The number of monotonic age model realizations to gather
-
-        Keyword Arguments
-        -----------------
-        minutes_torun : int or float
-            The maximum time to spend gathering monotonic age model
-            realizations.  May be reached before successful_sims, and if so,
-            will stop the simulation.
+            The number of successes after which the model will quit and report
+            success.  If ``max_sims`` is reached first, then
+            failure will be reported.
+        max_sims : int
+            The maximum number of simulations to run.  The model quits before
+            this number is reached if ``successful_sims`` is reached first.
 
         """
 
-        # Initialize
-        good_realiz = np.empty((self.date_count, 0))
-        all_realiz = np.empty((self.date_count, 0))
+        # Initialize empty simulation arrays
+        good_sims = np.empty((self.dates.size, successful_sims))
+        all_sims = np.empty((self.dates.size, max_sims))
 
-        success_count = 0
-        simulation_count = 0
+        sims = 0
+        good = 0
+        good_inds = []
+        # random.gauss takes 1 sigma
+        errors = self.errors / 2
 
-        max_runtime = 60.0 * minutes_torun
-
-        start_time = time.time()
-
-        run_simulation = True
-
-        while run_simulation:
-
+        # Quit when max or number of successes is hit
+        while sims < max_sims and good < successful_sims:
+            # Have to simulate each date separately
             simulation = []
-
-            for date, error in zip(self.dates, self.dating_errors):
+            for date, error in zip(self.dates, errors):
                 simulation.append(random.gauss(date, error))
+            simulation = np.array(simulation)
 
-            simulation = (np.atleast_2d(np.asarray(simulation)
-                                        ).reshape(self.date_count, 1))
-
+            # Put simulation in array
+            all_sims[:, sims] = simulation
+            # Test
             monotonicity_test = simulation[1:] - simulation[:-1]
 
+            # Check that there are no negative results
             if not (monotonicity_test < 0.0).any():
-                good_realiz = np.concatenate((good_realiz, simulation), axis=1)
-                success_count += 1
+                # Place in 'good' array, record position in 'all' array
+                good_sims[:, good] = simulation
+                good_inds.append(sims)
+                good += 1
 
-            all_realiz = np.concatenate((all_realiz, simulation), axis=1)
-            simulation_count += 1
+            sims += 1
 
-            # Try ending the simulation
-            if success_count == successful_sims:
-                print 'Target number of monotonic simulations acquired.\n'
-                run_simulation = False
+        # Get rid of empty portions of arrays, if any
+        self.good_sims = np.delete(good_sims, slice(good, successful_sims),
+                                   axis=1)
+        all_sims = np.delete(all_sims, slice(sims, max_sims), axis=1)
 
-            else:
-                current_time = time.time()
-                runtime = current_time - start_time
+        # Remove successful simulations from 'all'
+        self.bad_sims = np.delete(all_sims, good_inds, axis=1)
 
-                if runtime > max_runtime:
-                    run_simulation = False
-                    print 'Simulation timed out.\n'
+        # Calculate model median and error
+        self.model_median = np.median(self.good_sims, axis=1)
+        self.model_error = np.nanstd(self.good_sims, axis=1) * 2
 
-        self.success_count = success_count
-        self.simulation_count = simulation_count
+        # Record simulation counts and report
+        self.sim_count = (good, self.bad_sims.shape[1])
 
-        self.model_median = np.median(good_realiz, axis=1)
-        self.model_error = stats.nanstd(good_realiz, axis=1) * 2
+        if good == successful_sims:
+            print('Age modelling complete')
+        else:
+            print('Age modelling unsuccessful')
 
-        self.good_simulations = good_realiz
-        self.all_simulations = all_realiz
-
-    def view_montycarlo_results(self, xlabel, ylabel,
-                                figsize=(15, 15), tick_dim=(10, 2),
-                                tick_direction='in'):
+    def view_agemodel(self, ax, badsim_step=10, view_simulations=True,
+                      original_marker='o', model_marker='d',
+                      original_color='blue', model_color='green', zorder=20,
+                      use_depth=True, **ekwargs):
         """
-        View a plot that has the current depth-age data, all montycarlo
-            simulations, the monotonic simulations, and the final
-            median value of the monotonic simulations
+        View a plot of the age model results.
 
         Parameters
         ----------
-        xlabel : string
-            X-axis title
-        ylabel : string
-            Y-axis title
-
-        Keyword Arguments
-        -----------------
-        figsize : tuple of ints
-            Default (15,15).  The dimensions of the figure.
-        tick_dim : tuple of ints
-            Default (10,2).  The length, width of the tick marks.
-        tick_direction
-            Default 'in'.  ['in'|'out'|'inout'].  Sets the ticks to the
-            inside, outside, or crossing the plot frame.
-
-        Returns
-        -------
-        fig, ax : matplotlib figure, plot
-            Plot of the results of the montycarlo() simulations.
+        ax : matplotlib Axes object
+            The Axes on which to plot the age modelling results
+        badsim_step : int
+            Default 10.  Plotting all unsuccessful simulations in a large
+            Monte Carlo model run has significant time and memory costs.
+            This parameter will result in every nth unsuccessful simulation
+            plotted.
+        view_simulations : Boolean
+            Default True.  Turns on/off the simulation plotting, leaving just
+            the original age control points and the model results.
+        original_marker : string
+            Default 'o'.  The marker for the age control points.
+        model_marker : string
+            Default 'd'.  The marker for the model points.
+        original_color : string or tuple of floats
+            Default 'blue'.  The marker, line, and errorbar color for the
+            age control points.
+        model_color : string or tuple of floats
+            Default 'green'.  The marker, line, and errorbar color for the
+            model results.
+        zorder : int
+            Default 20.  Zorder of the age control points and model results.
+        use_depth : Boolean
+            Default ``True``, plot on depth scale.  If ``False``, plot on
+            height scale.
+        **ekwargs
+            Any Axes.errorbar keyword.
 
         """
 
-        # Initialize
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
-        ax.invert_yaxis()
+        z = self.depths
+        if not use_depth:
+            z = self.heights
 
-        # Plot all the simulations that occurred in orange
-        for i in range(0, self.simulation_count):
-            ax.plot(self.all_simulations[:, i], self.depths, color='orange')
+        # Plot simulations
+        if view_simulations:
+            for i in range(0, self.sim_count[1], badsim_step):
+                ax.plot(self.bad_sims[:, i], z, color=self.warning_color)
 
-        # Plot only the monotonic simulations in black
-        for i in range(0, self.success_count):
-            ax.plot(self.good_simulations[:, i], self.depths, color='black')
+            for i in range(0, self.sim_count[0]):
+                ax.plot(self.good_sims[:, i], z, color=self.good_color)
 
-        # Plot the selected dates/depths in a bold line
-        ax.plot(self.dates, self.depths, marker='o', lw=5, markersize=10)
+        # Plot original age control points and profile
+        ax.errorbar(self.dates, z, xerr=self.errors,
+                    marker=original_marker, zorder=zorder,
+                    color=original_color, ecolor=original_color, **ekwargs)
 
-        # Plot the median values of the monotonic simulations in a bold line
-        ax.plot(self.model_median, self.depths, marker='d', lw=5,
-                markersize=10)
+        # Plot model results
+        ax.errorbar(self.model_median, z, xerr=self.model_error,
+                    marker=model_marker, zorder=zorder + 2,
+                    color=model_color, ecolor=model_color, **ekwargs)
 
-        # Format plot ticks and labels
-        ax.xaxis.set_tick_params(length=tick_dim[0], width=tick_dim[1],
-                                 direction=tick_direction)
-
-        ax.tick_params(labelsize=16, pad=15)
-
-        ax.set_ylabel(ylabel, fontsize=20, labelpad=20)
-        ax.set_xlabel(xlabel, fontsize=20, labelpad=20)
-
-        return fig, ax
-
-    def interpolate_agemodel(self, interpolation):
+    def set_linear_interpolation_eq(self):
         """
-        Get ages from sample depths.
+        Calculate the linear interpolation equation for the model results.
+
+        """
+
+        kwargs = {'axis': 0,
+                  'bounds_error': False,
+                  'kind': 'linear'}
+
+        self.interpolationeq = interp1d(self.depths, self.model_median,
+                                        **kwargs)
+        self.interpolationeq_young = interp1d(self.depths, self.model_median -
+                                              self.model_error, **kwargs)
+        self.interpolationeq_old = interp1d(self.depths, self.model_median +
+                                            self.model_error, **kwargs)
+
+    def set_cubic_interpolation_eq(self):
+        """
+        Calculate the monotonic cubic interpolation equation for the
+        model results.
+
+        """
+
+        kwargs = {'extrapolate': True}
+
+        self.interpolationeq = PchipInterpolator(self.depths,
+                                                 self.model_median, **kwargs)
+        self.interpolationeq_young = PchipInterpolator(self.depths,
+                                                       self.model_median -
+                                                       self.model_error,
+                                                       **kwargs)
+        self.interpolationeq_old = PchipInterpolator(self.depths,
+                                                     self.model_median +
+                                                     self.model_error,
+                                                     **kwargs)
+
+    def set_subsample_ages(self, subsample_z, is_depth=True):
+        """
+        Use the interpolation equation to find subsample ages from z.
 
         Parameters
         ----------
-        interpolation : string
-            ['cubic'|'linear'].  Interpolation method between age poitns.
-            Cubic interpolation is one that enforces monotonicity.
+        subsample_z : sequence of ints or floats
+            The height or depth of the subsamples.
+        is_depth : Boolean
+            Default ``True``, indicates ``subsample_z`` represents depth
+            rather than height.
 
         """
 
-        # Aquire interpolation equations
-        if interpolation is 'linear':
+        if not hasattr(self, 'interpolationeq'):
+            raise AttributeError('Model interpolation equation not found.')
 
-            self.interpolation = 'linear'
-            self.interp_eq = interp1d(self.depths, self.model_median, axis=0,
-                                      bounds_error=False, kind='linear')
+        # Set both subsample depth and height attributes
+        if is_depth:
+            self.subsample_depths = subsample_z
+            self.subsample_heights = self.length - subsample_z
+        else:
+            self.subsample_depths = self.length - subsample_z
+            self.subsample_heights = subsample_z
 
-            self.interp_eq_err_low = interp1d(self.depths, (self.model_median -
-                                              self.model_error), axis=0,
-                                              bounds_error=False,
-                                              kind='linear')
+        # Use depths to make interpolations
+        self.subsample_ages = self.interpolationeq(self.subsample_depths)
+        self.subsample_young = self.interpolationeq_young(
+            self.subsample_depths)
+        self.subsample_old = self.interpolationeq_old(self.subsample_depths)
+        self.subsample_err = self.subsample_old - self.subsample_ages
 
-            self.interp_eq_err_hi = interp1d(self.depths, (self.model_median +
-                                             self.model_error), axis=0,
-                                             bounds_error=False, kind='linear')
-
-        if interpolation is 'cubic':
-
-            self.interpolation = 'cubic'
-            self.interp_eq = PchipInterpolator(self.depths, self.model_median,
-                                               extrapolate=True)
-
-            self.interp_eq_err_low = PchipInterpolator(self.depths,
-                                                       (self.model_median -
-                                                        self.model_error),
-                                                       extrapolate=True)
-
-            self.interp_eq_err_hi = PchipInterpolator(self.depths,
-                                                      (self.model_median +
-                                                       self.model_error),
-                                                      extrapolate=True)
-
-    def get_subsammple_ages(self, sample_depths, depth_isrange=False,
-                            interpolation='linear', usecurrent_interp=True,
-                            return_asrow=True):
+    def view_subsample_ages(self, ax, use_depth=True,
+                            errors_or_betweenx='errors', **kwargs):
         """
-        Get ages of subsamples from age model and subsample depths.
+        View a plot of the modelled subsample ages.  Plotted as either a series
+        of points with errorbars, or as a between value plot.
 
         Parameters
         ----------
-        sample_depths : sequence of floats
-            The positions of stable isotope or trace element drill subsample
-            sites.  Can input sequence of sample positions (ideal for irregular
-            spacings), or input [start, inclusive stop, sample interva] and set
-            depth_isrange to True.
-
-        Keyword Arguments
-        -----------------
-        depth_isrange : Boolean
-            Default False.  [True|False].
-            True: sample_depths are given as [start, stop, interval]
-            False: sample_depths are a complete list of depths to use
-        interpolation : string
-            Default 'linear'.  ['cubic'|'linear'].
-            Interpolation method between age points.
-            Cubic interpolation is one that enforces monotonicity.
-            If given interpolation doesn't match current one, or current one
-            does not exist, or usecurrent_interp is False, then new
-            interpolation equations will be calculated.
-        usecurrent_interp : Boolean
-            Default True.  [True|False].  If the desired interpolation matches
-            the current interpolation and this is set to False,
-            current interpolation equations will be overwritten
-            with new equations
+        ax : matplotlib Axes object
+            The Axes on which to plot the subsample ages.
+        use_depth : Boolean
+            Default ``True``, plot on depth scale.  If ``False``, plot on
+            height scale.
+        errors_or_betweenx : 'string'
+            Default 'errors'.  Plot series of points with errorbars.  If
+            anything else, plot as betweenx.
+        **kwargs
+            Any Axes.errorbar or Axes.fill_betweenx keyword argument
 
         """
 
-        # Initialize sample_depths
-        if depth_isrange:
-            sample_depths = np.arange(sample_depths[0], sample_depths[1] +
-                                      sample_depths[2], sample_depths[2])
+        z = self.depths
+        if not use_depth:
+            z = self.heights
 
-        self.sample_depths = sample_depths
-
-        # Check that appropriate interpolation equations oare available
-
-        if not hasattr(self, 'interpolation'):
-            self.interpolate_agemodel(interpolation)
-
-        if self.interpolation != interpolation and not usecurrent_interp:
-            self.interpolate_agemodel(interpolation)
-
-        self.sample_ages = self.interp_eq(self.sample_depths)
-        self.sample_herr = self.interp_eq_err_hi(self.sample_depths)
-        self.sample_lerr = self.interp_eq_err_low(self.sample_depths)
-        self.sample_err = self.sample_herr - self.sample_ages
-
-        print ('***DISCLAIMER: Any automatically extrapolated ages will '
-               'be crap, and therefore we recommend you do it yourself.***')
-
-        if return_asrow:
-            return self.sample_ages, self.sample_err
+        if errors_or_betweenx is 'errors':
+            ax.errorbar(self.subsample_ages, z,
+                        xerr=self.subsample_err, **kwargs)
         else:
-            # Return self.sample_ages as a column for copy-pasta into excel
-            return np.concatenate((np.atleast_2d(self.sample_depths).T,
-                                   np.atleast_2d(self.sample_ages).T,
-                                   np.atleast_2d(self.sample_err).T),
-                                  axis=1)
+            ax.fill_betweenx(z, self.subsample_young,
+                             self.subsample_old, **kwargs)
+            # Plot age line
+            ax.plot(self.subsample_ages, z,
+                    color=self.good_color, marker=None)
 
-    def oxcal_format(self, z_upperbound=None, z_lowerbound=None):
+    def write_oxcal_format(self, z_olderbound, z_youngerbound, output_file,
+                           is_depth=True):
         """
-        Output oxcal_format.  Depths will be converted into height using
-            total length given in __init__.
+        Output age control points into a text file, the contents of which
+        can be copy-pasted into an OxCal P_Sequence model setup.
+
+        Parameters
+        ----------
+        z_olderbound : int or float
+            The depth or height of the older boundary.
+        z_youngerbound : int or float
+            The depth or height of the younger boundary.
+        output_file : string
+            Full or relative path to destination text file.
+        is_depth : Boolean
+            Default ``True``, ``z_olderbound`` and ``z_youngerbound``
+            represent depths instead of heights.
 
         """
 
-        if z_upperbound is not None:
-            upper_boundary = str(self.total_length - z_upperbound)
+        if is_depth:
+            olderbound = self.length - z_olderbound
+            youngerbound = self.length - z_youngerbound
         else:
-            upper_boundary = str(self.total_length)
+            olderbound = z_olderbound
+            youngerbound = z_youngerbound
 
-        if z_lowerbound is not None:
-            lower_boundary = str(self.total_length - z_lowerbound)
-        else:
-            lower_boundary = '0'
+        oxcal = ['  Options(){BCAD=FALSE;};\n',
+                 '  Plot()\n',
+                 '  {\n',
+                 '    P_Sequence("",0.1,"",U(-2,2))\n',
+                 '    {\n',
+                 '      Boundary(){z=' + str(olderbound) + ';};\n']
 
-        print ('  Options(){BCAD=FALSE;};\n'
-               '  Plot()\n'
-               '  {\n'
-               '    P_Sequence("",0.1,"",U(-2,2))\n'
-               '    {\n'
-               '      Boundary(){z=' + lower_boundary + ';};')
+        for d, e, h in zip(self.dates, self.errors, self.heights):
+            oxcal.extend(['      Date("",N(calBP(' + str(d) + '),' +
+                          str(e) + ')){z=' + str(h) + ';};\n'])
 
-        for date in range(0, self.date_count)[::-1]:
-            ht = self.total_length - self.depths[date]
-            age = self.dates[date]
-            err = self.dating_errors[date]
+        oxcal.extend(['      Boundary(){z=' + str(youngerbound) + ';};\n',
+                      '    };\n',
+                      '  };\n'])
 
-            print ('      Date("",N(calBP(' + str(age) + '),' +
-                   str(err) + ')){z=' + str(ht) + ';};')
-
-        print ('      Boundary(){z=' + upper_boundary + ';};\n'
-               '    };\n'
-               '  };')
+        with open(output_file, 'w') as oxcalfile:
+            oxcalfile.writelines(oxcal)
