@@ -2,17 +2,14 @@
 
 descr = """SpeleoPy (a.k.a. `speleopy`): Paleoclimate record management.
 
-This package is designed to collect and organize proxy data from excel workbooks
-of paleoclimate archives, particularly facilitating the management of fragmented
-multi-proxy datasets.  Additionally, SpeleoPy can perform VPDB<->VSMOW
-conversions and ice-volume oxygen isotope corrections, create a simple
-age model with linear or monotonic cubic interpolation and format age data
-for input into Oxcal.
+Package for paleoclimate record data management using pandas, perform
+d18o ice volume correction, and construct simple Monte Carlo age models
+with Gaussian error distribution.
 
 """
 
 DISTNAME            = 'SpeleoPy'
-DESCRIPTION         = 'Paleoclimate record and proxy data management'
+DESCRIPTION         = 'Paleoclimate data and age modelling'
 LONG_DESCRIPTION    = descr
 MAINTAINER          = 'Mellissa Cross'
 MAINTAINER_EMAIL    = 'mellissa.cross@gmail.com'
@@ -22,8 +19,9 @@ VERSION             = '0.1'
 PYTHON_VERSION      = (2, 6)
 DEPENDENCIES        = {'numpy': (1, 6),
                        'matplotlib': (1, 2),
-                       'scipy' : (),
-                       'xlrd' : ()}
+                       'scipy' : (0, 9),
+                       'xlrd' : (),
+                       'pandas': (0, 16)}
 
 
 import os
@@ -119,6 +117,9 @@ if __name__ == '__main__':
         license=LICENSE,
         download_url=DOWNLOAD_URL,
         version=VERSION,
+        package_data={
+            '':['*.txt', '*.md'],
+        },
 
         classifiers=[
             'Development Status :: 4 - Beta',
@@ -137,7 +138,7 @@ if __name__ == '__main__':
         configuration=configuration,
 
         packages=setuptools.find_packages(),
-        include_package_data=True,
+        # include_package_data=True,
         zip_safe=False
     )
 

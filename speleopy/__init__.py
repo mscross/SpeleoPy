@@ -9,18 +9,14 @@ into an OxCal codeblock.
 """
 
 __all__ = ['AgeModel',
-		   'Record',
-		   'load_worksheet',
-		   'load_data',
-		   'sealevel_corrector',
-		   'sealevelagebracket',
-		   'smooth',
-		   'get_sealevel_data']
+           'PaleoRecord',
+           'load_worksheet',
+           'load_data',
+           'get_sealevel_data']
 
 
 from .damp import AgeModel
 
-from .record_class import Record, load_worksheet, load_data
+from .record_class import PaleoRecord, load_worksheet, load_data
 
-from .sealevel import (sealevel_corrector, sealevelagebracket, smooth,
-					   get_sealevel_data)
+from .sealevel import get_sealevel_data
