@@ -36,18 +36,22 @@ class AgeModel(object):
             Default ``True``, ``z`` indicates depths rather than height.
 
         """
-        # Set 2 sigma errors
-        self.errors = errors
-        if not is_2sigma:
-            self.errors = errors * 2
 
-        # Set depths
+        if len(errors * 2) > len(errors):
+            errors = np.array(errors)
+            z = np.array(z)
+            dates = np.array(dates)
+
         if not is_depth:
             self.depths = length - z
             self.heights = z
         else:
-            self.depths = z
             self.heights = length - z
+            self.depths = z
+
+        self.errors = errors
+        if not is_2sigma:
+            self.errors = self.errors * 2
 
         self.dates = dates
         self.length = length
@@ -63,7 +67,7 @@ class AgeModel(object):
 
         """
 
-        print("\n\tDepth\tHeight\tAge\t\t2s Error\n")
+        print("\n \tDepth\tHeight\tAge\t2s Error\n")
 
     def print_agecontrol_dates(self):
         """
@@ -120,18 +124,7 @@ class AgeModel(object):
         """
 
         younger = self.dates[:-1]
-
-        # Convert errors, dates, depths, heights to arrays if necessary
-        try:
-            youngest = younger - self.errors[:-1]
-
-        except TypeError:
-            self.dates = np.array(self.dates)
-            self.errors = np.array(self.errors)
-            self.depths = np.array(self.depths)
-            self.heights = np.array(self.heights)
-            younger = np.array(younger)
-            youngest = younger - self.errors[:-1]
+        youngest = younger - self.errors[:-1]
 
         older = self.dates[1:]
         oldest = older + self.errors[1:]
@@ -180,7 +173,7 @@ class AgeModel(object):
 
         self.check_monotonicity()
 
-    def view_monotonicity(self, ax, use_depth=True, **ekwargs):
+    def view_monotonicity(self, ax, use_depth=True, lw=1, **ekwargs):
         """
         View a plot of the monotonicity test results.  Intractable reversals
         are shown in red, tractable in orange, and monotonically increasing
@@ -201,18 +194,28 @@ class AgeModel(object):
         if not use_depth:
             z = self.heights
 
-        ax.errorbar(self.dates, z, xerr=self.errors,
-                    color=self.good_color, ecolor=self.good_color, **ekwargs)
+        good = None
+        ok = None
+        bad = None
+
+        ax.plot(self.dates, z, lw=lw, color='k')
+
+        good = ax.errorbar(self.dates, z, xerr=self.errors,
+                           color=self.good_color, ecolor=self.good_color,
+                           linestyle='none', **ekwargs)
 
         for i in self.reversal:
-            ax.errorbar(self.dates[i], z[i], xerr=self.errors[i],
-                        color=self.warning_color, ecolor=self.warning_color,
-                        **ekwargs)
+            ok = ax.errorbar(self.dates[i], z[i], xerr=self.errors[i],
+                             color=self.warning_color,
+                             ecolor=self.warning_color, linestyle='none',
+                             **ekwargs)
 
         for i in self.intractable:
-            ax.errorbar(self.dates[i], z[i], xerr=self.errors[i],
-                        color=self.bad_color, ecolor=self.bad_color,
-                        **ekwargs)
+            bad = ax.errorbar(self.dates[i], z[i], xerr=self.errors[i],
+                              color=self.bad_color, ecolor=self.bad_color,
+                              linestyle='none', **ekwargs)
+
+        return good, ok, bad
 
     def monty_carlo(self, successful_sims, max_sims):
         """
@@ -288,6 +291,7 @@ class AgeModel(object):
             print('Age modelling unsuccessful')
 
     def view_agemodel(self, ax, badsim_step=10, view_simulations=True,
+                      view_results=True, view_original=True,
                       original_marker='o', model_marker='d',
                       original_color='blue', model_color='green', zorder=20,
                       use_depth=True, **ekwargs):
@@ -330,6 +334,9 @@ class AgeModel(object):
         if not use_depth:
             z = self.heights
 
+        original = None
+        model = None
+
         # Plot simulations
         if view_simulations:
             for i in range(0, self.sim_count[1], badsim_step):
@@ -338,15 +345,20 @@ class AgeModel(object):
             for i in range(0, self.sim_count[0]):
                 ax.plot(self.good_sims[:, i], z, color=self.good_color)
 
-        # Plot original age control points and profile
-        ax.errorbar(self.dates, z, xerr=self.errors,
-                    marker=original_marker, zorder=zorder,
-                    color=original_color, ecolor=original_color, **ekwargs)
+        if view_results:
+            # Plot original age control points and profile
+            original = ax.errorbar(self.dates, z, xerr=self.errors,
+                                   marker=original_marker, zorder=zorder,
+                                   color=original_color, ecolor=original_color,
+                                   **ekwargs)
+        if view_original:
+            # Plot model results
+            model = ax.errorbar(self.model_median, z, xerr=self.model_error,
+                                marker=model_marker, zorder=zorder + 2,
+                                color=model_color, ecolor=model_color,
+                                **ekwargs)
 
-        # Plot model results
-        ax.errorbar(self.model_median, z, xerr=self.model_error,
-                    marker=model_marker, zorder=zorder + 2,
-                    color=model_color, ecolor=model_color, **ekwargs)
+        return original, model
 
     def set_linear_interpolation_eq(self):
         """
