@@ -9,7 +9,6 @@ class AgeModel(object):
     """
     Make a simple Monte Carlo age model and get subsample ages.
     Does not model across hiatuses or find hiatuses.
-
     """
 
     def __init__(self, z, dates, errors, length, is_2sigma=True,
@@ -34,7 +33,6 @@ class AgeModel(object):
             Set ``False`` if error in 1 sigma.
         is_depth : Boolean
             Default ``True``, ``z`` indicates depths rather than height.
-
         """
 
         if len(errors * 2) > len(errors):
@@ -64,7 +62,6 @@ class AgeModel(object):
     def _print_header(self):
         """
         Print  header for viewing age control, model, or subsample data.
-
         """
 
         print("\n \tDepth\tHeight\tAge\t2s Error\n")
@@ -72,20 +69,35 @@ class AgeModel(object):
     def print_agecontrol_dates(self):
         """
         Print the current sequence of age control points.
-
         """
 
         self._print_header()
 
         for n, (d, h, a, e) in enumerate(zip(self.depths, self.heights,
                                              self.dates, self.errors)):
-
             print(n, '.\t', d, '\t', h, '\t', a, '\t', e)
+
+    def print_monotonicity_results(self):
+        """
+        Like ``print_agecontrol_dates()``, but with reversal information.
+        Blank indicates perfectly in stratigraphic order.
+        """
+        print("\n \tDepth\tHeight\tAge\t2s Error\tInformation\n")
+
+        for n, (d, h, a, e) in enumerate(zip(self.depths, self.heights,
+                                             self.dates, self.errors)):
+            if n in self.intractable:
+                x = 'Complete reversal'
+            elif n in self.reversal:
+                x = 'In order within error'
+            else:
+                x = ''
+
+            print(n, '.\t', d, '\t', h, '\t', a, '\t', e, '\t', x)
 
     def print_model_dates(self):
         """
         Print the modelled age control points.
-
         """
 
         self._print_header()
@@ -101,7 +113,6 @@ class AgeModel(object):
     def print_subsample_dates(self):
         """
         Print the subsample depths, ages, and age errors
-
         """
 
         self._print_header()
@@ -120,7 +131,6 @@ class AgeModel(object):
         Check if the ages are monotonically increasing with depth.
         Distinguishes between tractable (errorbars overlap) and intractable
         (errorbars do not overlap) age reversals.
-
         """
 
         younger = self.dates[:-1]
@@ -149,7 +159,6 @@ class AgeModel(object):
             The factor(s) by which the indicated errors will be multiplied
         inds : int or sequence of ints of length (M)
             Indices corresponding to the errors requiring adjustment
-
         """
 
         self.errors[inds] = self.errors[inds] * adjust_by
@@ -163,7 +172,6 @@ class AgeModel(object):
         inds : int or sequence of ints
             The indices of the dates to delete.  Can be easily found with
             ``self.print_agecontrol_dates()``
-
         """
 
         self.dates = np.delete(self.dates, inds)
@@ -188,8 +196,8 @@ class AgeModel(object):
             height scale.
         **ekwargs
             Any Axes.errorbar keyword arguments
-
         """
+
         z = self.depths
         if not use_depth:
             z = self.heights
@@ -235,7 +243,6 @@ class AgeModel(object):
         max_sims : int
             The maximum number of simulations to run.  The model quits before
             this number is reached if ``successful_sims`` is reached first.
-
         """
 
         # Initialize empty simulation arrays
@@ -327,7 +334,6 @@ class AgeModel(object):
             height scale.
         **ekwargs
             Any Axes.errorbar keyword.
-
         """
 
         z = self.depths
@@ -363,7 +369,6 @@ class AgeModel(object):
     def set_linear_interpolation_eq(self):
         """
         Calculate the linear interpolation equation for the model results.
-
         """
 
         kwargs = {'axis': 0,
@@ -381,7 +386,6 @@ class AgeModel(object):
         """
         Calculate the monotonic cubic interpolation equation for the
         model results.
-
         """
 
         kwargs = {'extrapolate': True}
@@ -408,7 +412,6 @@ class AgeModel(object):
         is_depth : Boolean
             Default ``True``, indicates ``subsample_z`` represents depth
             rather than height.
-
         """
 
         if not hasattr(self, 'interpolationeq'):
@@ -447,7 +450,6 @@ class AgeModel(object):
             anything else, plot as betweenx.
         **kwargs
             Any Axes.errorbar or Axes.fill_betweenx keyword argument
-
         """
 
         z = self.depths
@@ -481,7 +483,6 @@ class AgeModel(object):
         is_depth : Boolean
             Default ``True``, ``z_olderbound`` and ``z_youngerbound``
             represent depths instead of heights.
-
         """
 
         if is_depth:
