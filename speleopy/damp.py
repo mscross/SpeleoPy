@@ -506,10 +506,11 @@ class AgeModel(object):
             young_age = (young_z - b_young) / m_young
 
             self.model_median_extrap = np.concatenate((
-                young_age, self.model_median_extrap))
+                np.array([young_age]), self.model_median_extrap))
             self.model_error_extrap = np.concatenate((
-                xerr_young, self.model_error_extrap))
-            self.depths_extrap = np.concatenate((young_z, self.depths_extrap))
+                np.array([xerr_young]), self.model_error_extrap))
+            self.depths_extrap = np.concatenate((
+                np.array([young_z]), self.depths_extrap))
 
         if old_z is not None:
             if not is_depth:
@@ -524,10 +525,11 @@ class AgeModel(object):
             old_age = (old_z - b_old) / m_old
 
             self.model_median_extrap = np.concatenate((
-                self.model_median_extrap, old_age))
+                self.model_median_extrap, np.array([old_age])))
             self.model_error_extrap = np.concatenate((
-                self.model_error_extrap, xerr_old))
-            self.depths_extrap = np.concatenate((self.depths_extrap, old_z))
+                self.model_error_extrap, np.array([xerr_old])))
+            self.depths_extrap = np.concatenate((
+                self.depths_extrap, np.array([old_z])))
 
         self.heights_extrap = self.length - self.depths_extrap
 
@@ -554,7 +556,7 @@ class AgeModel(object):
             Error on new x (age) value
         """
         m = (p1y - p0y) / (p1x - p0x)
-        b = p1y - m(p1x)
+        b = p1y - (m * p1x)
         xerr = self._addsub_error(p0xerr, p1xerr)
 
         return m, b, xerr
