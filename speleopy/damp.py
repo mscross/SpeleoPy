@@ -169,6 +169,8 @@ class AgeModel(object):
 
         self.errors[inds] *= adjust_by
 
+        self.check_monotonicity()
+
     def delete_dates(self, inds):
         """
         Remove dates from the age model and update monotonicity results.

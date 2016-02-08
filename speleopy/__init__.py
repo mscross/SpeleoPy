@@ -12,11 +12,18 @@ __all__ = ['AgeModel',
            'PaleoRecord',
            'load_worksheet',
            'load_data',
+           'icevol_corr_prep',
+           'convert_d18o',
+           'wrong_corrector',
+           'icevolume_correction',
+           'join_records',
            'get_sealevel_data']
 
 
 from .damp import AgeModel
 
-from .record_class import PaleoRecord, load_worksheet, load_data
+from .record_class import (PaleoRecord, load_worksheet, load_data,
+	icevol_corr_prep, convert_d18o, wrong_corrector, icevolume_correction,
+	join_records)
 
 from .sealevel import get_sealevel_data
