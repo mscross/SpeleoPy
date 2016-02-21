@@ -128,7 +128,7 @@ def icevolume_correction(record, target, newlabel, sealevel_data,
         will convert the VSMOW output to VPDB and add it to ``record``.
     """
     if not is_vsmow:
-        convert_d18o(record, target, target+' (VSMOW)')
+        convert_d18o(record, target, target+' (VSMOW)', vsmow2vpdb=False)
         target = target + ' (VSMOW)'
 
     record[newlabel] = (
