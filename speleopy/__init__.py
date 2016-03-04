@@ -9,12 +9,8 @@ into an OxCal codeblock.
 """
 
 __all__ = ['AgeModel',
-           'PaleoRecord',
-           'load_worksheet',
-           'load_data',
            'icevol_corr_prep',
            'convert_d18o',
-           'wrong_corrector',
            'icevolume_correction',
            'join_records',
            'get_sealevel_data']
@@ -22,8 +18,7 @@ __all__ = ['AgeModel',
 
 from .damp import AgeModel
 
-from .record_class import (PaleoRecord, load_worksheet, load_data,
-	icevol_corr_prep, convert_d18o, wrong_corrector, icevolume_correction,
-	join_records)
+from .record_class import (icevol_corr_prep, convert_d18o,
+  icevolume_correction,	join_records)
 
 from .sealevel import get_sealevel_data
