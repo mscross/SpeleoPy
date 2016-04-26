@@ -90,9 +90,7 @@ def icevolume_correction(record, target, newlabel, sealevel_data,
         convert_d18o(record, target, target+' (VSMOW)', vsmow2vpdb=False)
         target = target + ' (VSMOW)'
 
-    record[newlabel] = (
-        ((record[target]/1000+1) /
-         (sealevel_data.loc[record.index, 'd18o']/1000+1)-1)*1000)
+    record[newlabel] = record[target]-sealevel_data.loc[record.index, 'd18o']
 
     if output_vpdb:
         convert_d18o(record, newlabel, newlabel+' (VPDB)', vsmow2vpdb=True)
