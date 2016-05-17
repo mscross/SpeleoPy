@@ -20,7 +20,6 @@ PYTHON_VERSION      = (2, 6)
 DEPENDENCIES        = {'numpy': (1, 6),
                        'matplotlib': (1, 2),
                        'scipy' : (0, 9),
-                       'xlrd' : (),
                        'pandas': (0, 16)}
 
 
