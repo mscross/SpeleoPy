@@ -60,7 +60,7 @@ def get_package_version(package):
     version = []
     for version_attr in ('version', 'VERSION', '__version__'):
         if hasattr(package, version_attr) \
-                and isinstance(getattr(package, version_attr), str):
+                and isinstance(getattr(package, version_attr), (str, unicode)):
             version_info = getattr(package, version_attr, '')
             for part in re.split('\D+', version_info):
                 try:
