@@ -333,8 +333,11 @@ class AgeModel(object):
             This parameter will result in every nth unsuccessful simulation
             plotted.
         view_simulations : Boolean
-            Default True.  Turns on/off the simulation plotting, leaving just
-            the original age control points and the model results.
+            Default True.  Turns on/off the simulation plotting..
+        view_results : Boolean
+            Default True.  Turns on/off the results plotting.
+        view_original : Boolean
+            Default True.  Turns on/off plotting the original dates.
         original_marker : string
             Default 'o'.  The marker for the age control points.
         model_marker : string
