@@ -33,7 +33,7 @@ install:
   - conda info -a
 
   # Replace dep1 dep2 ... with your dependencies
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION pip nose flake8 numpy matplotlib pandas basemap geopandas
+  - conda install --yes python=$TRAVIS_PYTHON_VERSION pip nose flake8 numpy matplotlib pandas scipy
     # - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION pip nose flake8 numpy matplotlib pandas basemap geopandas
   # - source activate test-environment
   - pip install coveralls 
@@ -47,9 +47,9 @@ install:
   # - python setup.py install
 
 script:
-  - python run_tests.py
+  # - python run_tests.py
 
   - flake8 --exit-zero pysplit
 
-after_success:
-  coveralls
+# after_success:
+#   coveralls
