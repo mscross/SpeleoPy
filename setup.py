@@ -32,7 +32,12 @@ try:
     from distutils.command.build_py import build_py_2to3 as build_py
 except ImportError:
     from distutils.command.build_py import build_py
-
+    
+# String type checking for Python 2 and 3
+try:
+  basestring
+except NameError:  # Doesn't exist in Python 3
+  basestring = str
 
 def check_requirements():
     if sys.version_info < PYTHON_VERSION:
@@ -60,7 +65,7 @@ def get_package_version(package):
     version = []
     for version_attr in ('version', 'VERSION', '__version__'):
         if hasattr(package, version_attr) \
-                and isinstance(getattr(package, version_attr), (str, unicode)):
+                and isinstance(getattr(package, version_attr), basestring):
             version_info = getattr(package, version_attr, '')
             for part in re.split('\D+', version_info):
                 try:
