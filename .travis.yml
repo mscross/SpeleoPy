@@ -49,7 +49,7 @@ install:
 script:
   # - python run_tests.py
 
-  - flake8 --exit-zero pysplit
+  - flake8 --exit-zero speleopy
 
 # after_success:
 #   coveralls
