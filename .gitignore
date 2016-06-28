@@ -1,1 +1,5 @@
 *.pyc
+*.coverage
+*.egg-info*
+dist/*
+speleopy/version.py
