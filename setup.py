@@ -16,7 +16,7 @@ MAINTAINER_EMAIL    = 'mellissa.cross@gmail.com'
 LICENSE             = 'Modified BSD'
 URL                 = 'https://github.com/mscross/SpeleoPy'
 DOWNLOAD_URL        = 'https://pypi.python.org/pypi/SpeleoPy'
-VERSION             = '0.1.3'
+VERSION             = '0.1.4'
 PYTHON_VERSION      = (2, 6)
 DEPENDENCIES        = {'numpy': (1, 6),
                        'matplotlib': (1, 2),
