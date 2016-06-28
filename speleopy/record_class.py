@@ -1,6 +1,7 @@
 from __future__ import division, print_function
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 
 
 def icevol_corr_prep(record, agelabel, age_in_ky):
@@ -96,7 +97,7 @@ def icevolume_correction(record, target, newlabel, sealevel_data,
         convert_d18o(record, newlabel, newlabel+' (VPDB)', vsmow2vpdb=True)
 
 
-def join_records(record_list, record_names, separator_name='hiatus', 
+def join_records(record_list, record_names, separator_name='hiatus',
                  **concat_kw):
     """
     Put distinct records in the same DataFrame separated by rows of NaNs.

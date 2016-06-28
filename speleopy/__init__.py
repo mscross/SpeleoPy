@@ -15,6 +15,10 @@ __all__ = ['AgeModel',
            'join_records',
            'get_sealevel_data']
 
+# Find package and data directories
+import os.path
+_pkg_dir = os.path.abspath(os.path.dirname(__file__))
+data_dir = os.path.join(_pkg_dir, 'data')
 
 from .damp import AgeModel
 
