@@ -14,7 +14,8 @@ LONG_DESCRIPTION    = descr
 MAINTAINER          = 'Mellissa Cross'
 MAINTAINER_EMAIL    = 'mellissa.cross@gmail.com'
 LICENSE             = 'Modified BSD'
-DOWNLOAD_URL        = ''
+URL                 = 'https://github.com/mscross/SpeleoPy'
+DOWNLOAD_URL        = 'https://pypi.python.org/pypi/SpeleoPy'
 VERSION             = '0.1.3'
 PYTHON_VERSION      = (2, 6)
 DEPENDENCIES        = {'numpy': (1, 6),
@@ -32,7 +33,7 @@ try:
     from distutils.command.build_py import build_py_2to3 as build_py
 except ImportError:
     from distutils.command.build_py import build_py
-    
+
 # String type checking for Python 2 and 3
 try:
   basestring
@@ -119,10 +120,11 @@ if __name__ == '__main__':
         maintainer=MAINTAINER,
         maintainer_email=MAINTAINER_EMAIL,
         license=LICENSE,
+        url=URL,
         download_url=DOWNLOAD_URL,
         version=VERSION,
         package_data={
-            '':['*.txt', '*.md'],
+            'speleopy': ['data/*.txt', '*.md'],
         },
 
         classifiers=[
@@ -145,9 +147,3 @@ if __name__ == '__main__':
         # include_package_data=True,
         zip_safe=False
     )
-
-# Not included as this package has no post-install scripts or build req:
-      # entry_points={
-      #     'console_scripts': ['skivi = skimage.scripts.skivi:main'],
-      # },
-      # cmdclass={'build_py': build_py},
