@@ -1,8 +1,11 @@
-import pandas as pd
-import numpy as np
-from scipy.interpolate import interp1d
+from __future__ import print_function, division
+
 import os
-import record_class as rc
+import numpy as np
+import pandas as pd
+from scipy.interpolate import interp1d
+
+from . import data_dir
 
 
 def get_sealevel_data(interpolation='linear'):
@@ -19,9 +22,7 @@ def get_sealevel_data(interpolation='linear'):
         sea level data.
 
     """
-    path, _ = os.path.split(rc.__file__)
-
-    sealevel_file = os.path.join(path, 'data/sealevel.txt')
+    sealevel_file = os.path.join(data_dir, 'sealevel.txt')
 
     with open(sealevel_file) as sealevel:
         contents = sealevel.readlines()
